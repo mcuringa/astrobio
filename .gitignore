@@ -150,4 +150,5 @@ vite.config.ts.timestamp-*
 
 
 svr/voices
-config.toml
+config.tomltemp
+tmp

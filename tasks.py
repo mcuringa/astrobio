@@ -1,6 +1,9 @@
 from invoke import task
 from pathlib import Path
 import subprocess
+import shutil
+import tomllib
+import os
 
 VOICES = """
 en_GB-alba-medium.onnx
@@ -8,6 +11,15 @@ es_AR-daniela-high.onnx
 it_IT-paola-medium.onnx
 """.split()
 
+
+def get_config() -> dict:
+    """Get the configuration from the config.toml file."""
+    config_path = Path("./config.toml")
+    if not config_path.exists():
+        raise FileNotFoundError(f"Could not find config.toml at {config_path}")
+    with config_path.open("rb") as f:
+        config = tomllib.load(f)
+    return config
 
 @task
 def test_voices(c):
@@ -23,7 +35,6 @@ def test_voices(c):
         c.run(cmd)
         subprocess.run(cmd)
 
-@task
 def find_circuitpy() -> Path:
     """Find the mount point for the CIRCUITPY volume."""
     candidates = []
@@ -57,7 +68,7 @@ def find_circuitpy() -> Path:
     print(f"Could not find CIRCUITPY volume. Searched: {searched}")
     return None
 
-@task(name="circup-libs")
+@task(name="circup")
 def circ_libs(c):
     """Install CircuitPython libraries from requirements-circuitpython.txt."""
 
@@ -77,3 +88,58 @@ def circ_libs(c):
         [circup, "--path", str(circuitpy_path), "install", *libs],
         check=True,
     )
+
+
+@task
+def config_micro(c):
+    """Generate config.py from config.toml for circuitpython programs."""
+    def emit(data, indent=0):
+        lines = []
+        pad = " " * indent
+
+        # Values first
+        for key, value in data.items():
+            if not isinstance(value, dict):
+                lines.append(f"{pad}{key} = {value!r}")
+
+        # Sections become namespace classes
+        for key, value in data.items():
+            if isinstance(value, dict):
+                if lines:
+                    lines.append("")
+                lines.append(f"{pad}class {key}:")
+                body = emit(value, indent + 4)
+                lines.extend(body or [f"{pad}    pass"])
+
+        return lines
+
+    py_file = Path("./micro/config.py")
+    config = get_config()
+
+    output = [
+        "# Generated from config.toml -- do not edit.",
+        "",
+        *emit(config),
+        "",
+    ]
+
+    py_file.write_text("\n".join(output))
+
+
+@task
+def push(c, code="code.py"):
+    """Copy config.toml into remote and all remote python files into CIRCUITPY."""
+    print("Pushing config.toml and micro/*.py files to CIRCUITPY...")
+    circuitpy_path = find_circuitpy()
+
+    # update config to config.py
+    config_micro(c)
+
+    # copy all .py files from micro to CIRCUITPY
+    for py_file in Path("micro").glob("*.py"):
+        print(f"Copying {py_file} to {circuitpy_path / py_file.name}")
+        shutil.copy2(py_file, circuitpy_path / py_file.name)
+    # copy code to code.py
+    shutil.copy2(Path("micro") / code, circuitpy_path / "code.py")
+
+    print("Pushed micro/*.py files to CIRCUITPY.")
