@@ -2,13 +2,43 @@ import board
 import neopixel
 import time
 import digitalio
-import utils
+import util
 
-requests = utils.get_requests()
-print("wifi test")
-response = requests.get("https://api.github.com")
-print("response status code:", response.status_code)
-print("response text:", response.text)
+
+import time
+import math
+import board
+import analogio
+import pwmio
+from adafruit_motor import servo
+
+
+# tesing the servo motor
+needle_pwm = pwmio.PWMOut(board.A2, frequency=50, duty_cycle=0)
+needle = servo.Servo(needle_pwm, actuation_range=180)
+pot = analogio.AnalogIn(board.A1)
+
+while True:
+
+    needle.angle = 0
+    time.sleep(0.1)
+    needle.angle = 45
+    time.sleep(0.1)
+    needle.angle = 90
+    time.sleep(0.1)
+    needle.angle = 135
+    time.sleep(0.1)
+    needle.angle = 180
+    # print the pots
+    print("pot value:", pot.value)
+
+
+
+# requests = util.get_requests()
+# print("wifi test")
+# response = requests.get("https://api.github.com")
+# print("response status code:", response.status_code)
+# print("response text:", response.text)
 
 # print("running basic qtpy test")
 
