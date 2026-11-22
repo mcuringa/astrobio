@@ -1,0 +1,4 @@
+# Host Python dependencies. CircuitPython libraries live in micro/requirements.txt.
+circup==3.1.0
+invoke==3.0.3
+piper-tts==1.8.0

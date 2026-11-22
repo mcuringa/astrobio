@@ -1,15 +1,88 @@
 from invoke import task
 from pathlib import Path
 import subprocess
+import sys
 import shutil
 import tomllib
 import os
+import time
+from urllib.error import URLError
+from urllib.request import urlopen
+from invoke.exceptions import Exit
 
 VOICES = """
 en_GB-alba-medium.onnx
 es_AR-daniela-high.onnx
 it_IT-paola-medium.onnx
 """.split()
+
+
+@task
+def install_node(c):
+    """Install and update npm dependencies for the client and server."""
+    root = Path(__file__).resolve().parent
+    for project in ("client", "svr"):
+        for command in ("install", "update"):
+            subprocess.run(["npm", command], cwd=root / project, check=True)
+
+
+@task
+def get_voices(c):
+    """Download the en_GB-alba-medium Piper voice into svr/voices."""
+    output = Path(__file__).resolve().parent / "svr" / "voices"
+    output.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            sys.executable, "-m", "piper.download_voices",
+            "--download-dir", str(output), "en_GB-alba-medium",
+        ],
+        check=True,
+    )
+
+
+@task
+def run_all(c):
+    """Build the app, start the server, and open it in Chromium."""
+    root = Path(__file__).resolve().parent
+    chromium = shutil.which("chromium") or shutil.which("chromium-browser")
+    if chromium is None:
+        raise Exit("Chromium was not found on PATH.", code=1)
+
+    for project in ("client", "svr"):
+        subprocess.run(["npm", "run", "build"], cwd=root / project, check=True)
+
+    url = "http://127.0.0.1:3000"
+    server = subprocess.Popen(["node", "dist/index.js"], cwd=root / "svr")
+    try:
+        deadline = time.monotonic() + 30
+        while True:
+            if server.poll() is not None:
+                raise Exit("Node server exited during startup.", code=1)
+            try:
+                with urlopen(f"{url}/api/health", timeout=1) as response:
+                    if response.status == 200:
+                        break
+            except (URLError, TimeoutError):
+                pass
+            if time.monotonic() >= deadline:
+                raise Exit("Timed out waiting for the Node server.", code=1)
+            time.sleep(0.2)
+
+        subprocess.Popen([chromium, url])
+        print(f"App running at {url}. Press Ctrl+C to stop.", flush=True)
+        server.wait()
+        if server.returncode:
+            raise Exit(f"Node server exited with code {server.returncode}.", code=1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if server.poll() is None:
+            server.terminate()
+            try:
+                server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait()
 
 
 def get_config() -> dict:

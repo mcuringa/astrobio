@@ -1,4 +1,5 @@
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import { EventProvider } from './services/EventProvider'
 import Admin from './views/Admin'
 import LockScreen from './views/LockScreen'
 import PlanetData from './views/PlanetData'
@@ -7,6 +8,7 @@ import NavScreen from './views/NavScreen'
 export default function App() {
   return (
     <BrowserRouter>
+      <EventProvider>
       <Routes>
         <Route
           path="/"
@@ -40,6 +42,7 @@ export default function App() {
         <Route path="/nav" element={<NavScreen />} />
         <Route path="*" element={<LockScreen />} />
       </Routes>
+      </EventProvider>
     </BrowserRouter>
   )
 }

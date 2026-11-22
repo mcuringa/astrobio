@@ -24,6 +24,18 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/api/planet", (req, res) => {
+  const planetId = req.query.planet_id;
+
+  if (typeof planetId !== "string" || planetId.trim() === "") {
+    res.status(400).json({ error: "planet_id must be a non-empty string" });
+    return;
+  }
+
+  console.log("planet_id:", planetId);
+  res.json({ received: true, planet_id: planetId });
+});
+
 app.use(express.static(clientDist));
 
 // react client
